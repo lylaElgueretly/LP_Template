@@ -1,52 +1,58 @@
+# LP_Template_app.py
 import streamlit as st
 from docx import Document
 import json
 
-st.set_page_config(page_title="5-Day AI Lesson Plan Generator", layout="wide")
-st.title("5-Day AI Lesson Plan Generator")
+def main():
+    st.set_page_config(page_title="5-Day AI Lesson Plan Generator", layout="wide")
+    st.title("5-Day AI Lesson Plan Generator")
 
-st.write("""
-Upload your AI-generated JSON output containing the lesson plan data.
-The app will populate the WLPT Word template with your content.
-""")
+    st.write("""
+    Upload your AI-generated JSON output containing the lesson plan data.
+    The app will populate the WLPT Word template with your content.
+    """)
 
-# Upload JSON file from user
-uploaded_file = st.file_uploader("Upload AI JSON output", type="json")
+    # Upload JSON file from user
+    uploaded_file = st.file_uploader("Upload AI JSON output", type="json")
 
-if uploaded_file:
-    try:
-        # Load JSON content
-        lesson_plan_json = json.load(uploaded_file)
+    if uploaded_file:
+        try:
+            # Load JSON content
+            lesson_plan_json = json.load(uploaded_file)
 
-        # Load the Word template
-        template_path = "templates/WLPT.docx"
-        template_doc = Document(template_path)
+            # Load the Word template
+            template_path = "templates/WLPT.docx"
+            template_doc = Document(template_path)
 
-        # Replace placeholders in all tables
-        for table in template_doc.tables:
-            for row in table.rows:
-                for cell in row.cells:
-                    for key, value in lesson_plan_json.items():
-                        placeholder = f"{{{{{key}}}}}"  # e.g., {{Class1_LearningObjective}}
-                        if placeholder in cell.text:
-                            cell.text = cell.text.replace(placeholder, value)
+            # Replace placeholders in all tables
+            for table in template_doc.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        for key, value in lesson_plan_json.items():
+                            placeholder = f"{{{{{key}}}}}"  # e.g., {{Class1_LearningObjective}}
+                            if placeholder in cell.text:
+                                cell.text = cell.text.replace(placeholder, value)
 
-        # Save the populated lesson plan
-        output_path = "LessonPlan_Filled.docx"
-        template_doc.save(output_path)
+            # Save the populated lesson plan
+            output_path = "LessonPlan_Filled.docx"
+            template_doc.save(output_path)
 
-        st.success("Lesson plan generated successfully!")
+            st.success("Lesson plan generated successfully!")
 
-        # Provide download button
-        with open(output_path, "rb") as f:
-            st.download_button(
-                label="Download Populated Lesson Plan",
-                data=f,
-                file_name="LessonPlan_Filled.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            )
+            # Provide download button
+            with open(output_path, "rb") as f:
+                st.download_button(
+                    label="Download Populated Lesson Plan",
+                    data=f,
+                    file_name="LessonPlan_Filled.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                )
 
-    except Exception as e:
-        st.error(f"Error processing file: {e}")
-else:
-    st.info("Please upload your AI-generated JSON file to populate the template.")
+        except Exception as e:
+            st.error(f"Error processing file: {e}")
+    else:
+        st.info("Please upload your AI-generated JSON file to populate the template.")
+
+# Main guard to make sure Streamlit recognizes the file
+if __name__ == "__main__":
+    main()
