@@ -4,12 +4,14 @@ from docx import Document
 import json
 
 def main():
+    # Page configuration
     st.set_page_config(page_title="5-Day AI Lesson Plan Generator", layout="wide")
     st.title("5-Day AI Lesson Plan Generator")
 
     st.write("""
-    Upload your AI-generated JSON output containing the lesson plan data.
-    The app will populate the WLPT Word template with your content.
+    Upload your AI-generated JSON file containing the lesson plan data.
+    This app will populate the WLPT Word template with your content, preserving
+    logos and table formatting.
     """)
 
     # Upload JSON file from user
@@ -53,6 +55,6 @@ def main():
     else:
         st.info("Please upload your AI-generated JSON file to populate the template.")
 
-# Main guard to make sure Streamlit recognizes the file
+# Main guard
 if __name__ == "__main__":
     main()
