@@ -3,98 +3,73 @@ from docx import Document
 import tempfile
 
 # ----------------------------------
-# LOCKED MASTER AI PROMPT (GOVERNOR)
+# MASTER PROMPT / RULES (LOCKED)
 # ----------------------------------
 MASTER_AI_PROMPT = """
 You are an expert UK secondary English curriculum designer.
+Output a weekly lesson plan in the exact WLPT template style.
 
-You receive student-facing teaching materials for five days.
-These materials are not lesson plans.
-
-You must infer pedagogical intent and reconstruct a coherent
-five-day lesson sequence.
-
-NON-NEGOTIABLE RULES:
-- Learning objectives: 1–2 short, child-friendly, starting with 'Students will...'
-- Write in third person (teacher does / students do / when)
-- Success criteria must be measurable
-- Lesson structure MUST be:
-  1. Starter activity
-  2. Teacher modelling (main activity using provided materials)
-  3. Differentiated independent work (LA / MA / HA without new materials)
-- Differentiation through grouping, scaffolding, seating, teacher guidance only
-- Plenary must act as formative assessment
-- Reflection MUST be left blank
-- Homework ONLY if explicitly requested; otherwise leave blank
-- Ensure clear progression across the five days
-- Day 5 prioritises application or assessment
-- Keep week date, week number, year/class, and teacher details EMPTY
+Rules:
+- Produce third person: Teacher does / Students do
+- Include timings for each activity
+- Starter → Main teaching → Differentiated independent work → Plenary
+- LA / MA / HA differentiation
+- Key Vocabulary + Key Questions
+- Success criteria: measurable outcomes
+- Reflection blank
+- Homework only if provided
+- Keep week/date/teacher/year empty
 - Use British spelling
+- Preserve example sentences or extracts from materials if possible
 """
 
 # ----------------------------------
 # APP CONFIG
 # ----------------------------------
-st.set_page_config(
-    page_title="5-Day AI Lesson Plan Generator",
-    layout="wide"
-)
-
+st.set_page_config(page_title="5-Day AI Lesson Plan Generator", layout="wide")
 st.title("📘 5-Day AI Lesson Plan Generator")
-st.markdown(
-    "Upload **student-facing materials** for each day. "
-    "Supported formats: DOCX, PDF, PPTX. "
-    "The app will infer teaching intent and generate a full weekly lesson plan."
-)
+st.markdown("""
+Upload **student-facing materials** for each day. 
+Supported formats: DOCX, PDF, PPTX. 
+The app will generate a **full weekly lesson plan** in your WLPT Word template format.
+""")
 
 # ----------------------------------
-# TEXT EXTRACTION (MINIMAL & SAFE)
+# TEXT EXTRACTION
 # ----------------------------------
 def extract_text(file):
-    # For now, we only reliably extract DOCX text.
-    # PDFs and PPTX are accepted but treated as contextual signals.
     if file.name.endswith(".docx"):
         doc = Document(file)
         return "\n".join(p.text for p in doc.paragraphs)
-    return ""
+    # For simplicity, PDFs and PPTX can be handled later or as notes
+    return f"[Content from {file.name}]"
 
 # ----------------------------------
-# DAY-BY-DAY INPUT (KEY FIX)
+# DAY-BY-DAY INPUT
 # ----------------------------------
 def day_section(day_number):
     st.subheader(f"📅 Day {day_number}")
-
+    
     materials = st.file_uploader(
-        f"Upload materials for Day {day_number}",
-        type=["docx", "pdf", "pptx"],
+        f"Upload materials for Day {day_number}", 
+        type=["docx","pdf","pptx"], 
         accept_multiple_files=True,
         key=f"materials_day_{day_number}"
     )
-
+    
     col1, col2 = st.columns(2)
-
     with col1:
-        focus = st.text_input(
-            "Lesson focus (what the lesson is mainly about)",
-            key=f"focus_{day_number}"
-        )
-
+        focus = st.text_input(f"Lesson Focus for Day {day_number}", key=f"focus_{day_number}")
     with col2:
-        skills = st.text_input(
-            "Skills focus (e.g. inference, vocabulary, structure)",
-            key=f"skills_{day_number}"
-        )
-
-    notes = st.text_area(
-        "Optional teacher notes (grouping, pace, SEN/EAL)",
-        key=f"notes_{day_number}"
-    )
-
+        skills = st.text_input(f"Skills Focus for Day {day_number}", key=f"skills_{day_number}")
+    
+    notes = st.text_area(f"Optional Teacher Notes for Day {day_number}", key=f"notes_{day_number}")
+    
     extracted = ""
     if materials:
         for file in materials:
             extracted += extract_text(file) + "\n"
-
+    
     return {
         "day": day_number,
         "focus": focus,
@@ -103,76 +78,73 @@ def day_section(day_number):
         "materials_text": extracted.strip()
     }
 
-# ----------------------------------
-# COLLECT WEEK DATA
-# ----------------------------------
-st.header("🗂 Organise Materials by Day")
-
 week_data = []
-for d in range(1, 6):
+st.header("🗂 Organise Materials by Day")
+for d in range(1,6):
     week_data.append(day_section(d))
     st.divider()
 
 # ----------------------------------
-# RULE-BASED AI SIMULATION (SAFE)
+# SIMULATED AI LESSON PLAN GENERATION
 # ----------------------------------
 def generate_lesson_plan(week_data):
-    output = {}
-
+    plan = {}
+    
     for day in week_data:
         d = day["day"]
-
-        output[f"Class{d}_LearningObjective"] = (
-            f"Students will develop {day['skills']} skills. "
-            f"Students will apply these skills through {day['focus']}."
+        
+        plan[f"Class{d}_LearningObjective"] = (
+            f"Students will develop {day['skills']} skills through {day['focus']} activities. "
+            f"They will analyse and apply their understanding using the provided materials."
         )
-
-        output[f"Class{d}_SuccessCriteria"] = (
-            "Students can meet the objective by using appropriate subject vocabulary "
-            "and completing the independent task accurately."
+        
+        plan[f"Class{d}_SuccessCriteria"] = (
+            "Students can demonstrate understanding through annotation, discussion, or written tasks, "
+            "and meet the objectives specified for the lesson."
         )
-
-        output[f"Class{d}_Vocabulary"] = (
-            "adventure, description, atmosphere, verb, detail"
+        
+        plan[f"Class{d}_Vocabulary"] = (
+            "adventure, description, atmosphere, verb, figurative language, tone, mood, suspense"
         )
-
-        output[f"Class{d}_KeyQuestions"] = (
-            "How does the writer create interest? "
-            "Which choices are most effective and why?"
+        
+        plan[f"Class{d}_KeyQuestions"] = (
+            "What effect does the language have on the reader? "
+            "Which choices create tension or mood? "
+            "How does sentence structure affect pacing?"
         )
-
-        output[f"Class{d}_StarterActivity"] = (
-            "The teacher introduces a short retrieval or engagement task. "
+        
+        # Starter / Main / Differentiated with examples and timing
+        plan[f"Class{d}_StarterActivity"] = (
+            "Starter (5 min): Teacher introduces a short engagement task using an example from the material. "
             "Students respond orally or in writing to activate prior learning."
         )
-
-        output[f"Class{d}_MainTeaching"] = (
-            "The teacher models the target skill using the uploaded materials, "
-            "explaining thinking aloud and questioning students to check understanding."
+        
+        plan[f"Class{d}_MainTeaching"] = (
+            "Teacher Input / Modelling (10-15 min): Teacher models skills using extracts from the uploaded materials. "
+            "Students follow along, annotate examples, and engage in think-aloud analysis."
         )
-
-        output[f"Class{d}_DifferentiatedActivities"] = (
-            "Students complete independent work. "
-            "LA students receive additional guidance, MA students complete the core task, "
-            "and HA students extend responses through depth or justification."
+        
+        plan[f"Class{d}_DifferentiatedActivities"] = (
+            "Independent / Guided Work (15-20 min):\n"
+            "LA: Complete basic identification tasks with scaffolding.\n"
+            "MA: Annotate examples and explain effects in 2-3 sentences.\n"
+            "HA: Produce extended analytical paragraphs using examples, vocabulary, and reasoning."
         )
-
-        output[f"Class{d}_Plenary"] = (
-            "Students complete an exit task or self-assess against the success criteria. "
-            "The teacher gathers evidence of learning."
+        
+        plan[f"Class{d}_Plenary"] = (
+            "Plenary (5 min): Exit ticket or formative assessment. Students summarise key learning and teacher collects evidence."
         )
-
-        output[f"Class{d}_Reflection"] = ""  # Must remain blank
-        output[f"Class{d}_Homework"] = ""    # Only filled if explicitly requested
-
-    return output
+        
+        plan[f"Class{d}_Reflection"] = ""  # Leave blank
+        plan[f"Class{d}_Homework"] = ""     # Optional, empty if not specified
+    
+    return plan
 
 # ----------------------------------
-# WORD TEMPLATE POPULATION
+# POPULATE WLPT TEMPLATE
 # ----------------------------------
 def populate_template(template_path, data):
     doc = Document(template_path)
-
     for table in doc.tables:
         for row in table.rows:
             for cell in row.cells:
@@ -180,7 +152,6 @@ def populate_template(template_path, data):
                     placeholder = f"{{{{{key}}}}}"
                     if placeholder in cell.text:
                         cell.text = cell.text.replace(placeholder, value)
-
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".docx")
     doc.save(tmp.name)
     return tmp.name
@@ -189,15 +160,14 @@ def populate_template(template_path, data):
 # GENERATE BUTTON
 # ----------------------------------
 if st.button("✨ Generate Weekly Lesson Plan"):
-    with st.spinner("Analysing materials and generating lesson plan..."):
+    with st.spinner("Generating high-fidelity lesson plan..."):
         lesson_data = generate_lesson_plan(week_data)
         output_path = populate_template("templates/WLPT.docx", lesson_data)
-
-    st.success("Weekly lesson plan generated successfully.")
-
+    
+    st.success("✅ Lesson plan generated successfully!")
     with open(output_path, "rb") as f:
         st.download_button(
-            "⬇ Download Lesson Plan",
+            "⬇ Download Weekly Lesson Plan",
             f,
             file_name="Weekly_Lesson_Plan.docx"
         )
