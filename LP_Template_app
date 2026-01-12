@@ -1,4 +1,4 @@
-# streamlit_app.py
+# LP_Template_app.py
 import streamlit as st
 from docx import Document
 import json
@@ -23,7 +23,7 @@ def main():
             # Load JSON content
             lesson_plan_json = json.load(uploaded_file)
 
-            # Ensure templates folder exists
+            # Ensure template exists
             template_path = os.path.join("templates", "WLPT.docx")
             if not os.path.exists(template_path):
                 st.error("Template file WLPT.docx not found in templates folder!")
