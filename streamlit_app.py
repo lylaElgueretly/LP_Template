@@ -1,141 +1,208 @@
-# LP_Template_app.py
 import streamlit as st
 from docx import Document
-from pptx import Presentation
-import pdfplumber
-import openai  # For AI inference
-import os
+import tempfile
 
-# Set your OpenAI API key (or use environment variable)
-# Make sure to set OPENAI_API_KEY in your environment for security
-openai.api_key = st.secrets.get("OPENAI_API_KEY", "")
+# ----------------------------------
+# LOCKED MASTER AI PROMPT (GOVERNOR)
+# ----------------------------------
+MASTER_AI_PROMPT = """
+You are an expert UK secondary English curriculum designer.
 
-# Function to extract text from DOCX
-def extract_text_docx(file):
+You receive student-facing teaching materials for five days.
+These materials are not lesson plans.
+
+You must infer pedagogical intent and reconstruct a coherent
+five-day lesson sequence.
+
+NON-NEGOTIABLE RULES:
+- Learning objectives: 1–2 short, child-friendly, starting with 'Students will...'
+- Write in third person (teacher does / students do / when)
+- Success criteria must be measurable
+- Lesson structure MUST be:
+  1. Starter activity
+  2. Teacher modelling (main activity using provided materials)
+  3. Differentiated independent work (LA / MA / HA without new materials)
+- Differentiation through grouping, scaffolding, seating, teacher guidance only
+- Plenary must act as formative assessment
+- Reflection MUST be left blank
+- Homework ONLY if explicitly requested; otherwise leave blank
+- Ensure clear progression across the five days
+- Day 5 prioritises application or assessment
+- Keep week date, week number, year/class, and teacher details EMPTY
+- Use British spelling
+"""
+
+# ----------------------------------
+# APP CONFIG
+# ----------------------------------
+st.set_page_config(
+    page_title="5-Day AI Lesson Plan Generator",
+    layout="wide"
+)
+
+st.title("📘 5-Day AI Lesson Plan Generator")
+st.markdown(
+    "Upload **student-facing materials** for each day. "
+    "The system will infer teaching intent and generate a professional weekly lesson plan."
+)
+
+# ----------------------------------
+# FILE TEXT EXTRACTION (DOCX ONLY FOR NOW)
+# ----------------------------------
+def extract_docx_text(file):
     doc = Document(file)
-    full_text = []
-    for para in doc.paragraphs:
-        full_text.append(para.text)
-    return "\n".join(full_text)
+    return "\n".join(p.text for p in doc.paragraphs)
 
-# Function to extract text from PDF
-def extract_text_pdf(file):
-    full_text = []
-    with pdfplumber.open(file) as pdf:
-        for page in pdf.pages:
-            full_text.append(page.extract_text())
-    return "\n".join(full_text)
+def extract_text(file):
+    if file and file.name.endswith(".docx"):
+        return extract_docx_text(file)
+    return ""
 
-# Function to extract text from PPTX
-def extract_text_pptx(file):
-    prs = Presentation(file)
-    full_text = []
-    for slide in prs.slides:
-        for shape in slide.shapes:
-            if hasattr(shape, "text"):
-                full_text.append(shape.text)
-    return "\n".join(full_text)
+# ----------------------------------
+# DAY INPUT SECTION
+# ----------------------------------
+def day_input(day_number):
+    st.subheader(f"📅 Day {day_number}")
 
-# Function to call AI to generate lesson plan JSON
-def generate_lesson_plan(text_content):
+    col1, col2 = st.columns(2)
+
+    with col1:
+        materials = st.file_uploader(
+            f"Day {day_number} materials (PowerPoint / Worksheet / Text)",
+            type=["docx"],
+            accept_multiple_files=True,
+            key=f"materials_{day_number}"
+        )
+
+    with col2:
+        focus = st.text_input(
+            "Lesson focus (e.g. analysing language, planning, drafting)",
+            key=f"focus_{day_number}"
+        )
+
+        skills = st.text_input(
+            "Skills emphasis (e.g. inference, vocabulary, structure)",
+            key=f"skills_{day_number}"
+        )
+
+        notes = st.text_area(
+            "Optional class notes (pace, grouping, SEN/EAL)",
+            key=f"notes_{day_number}"
+        )
+
+    extracted_text = ""
+    if materials:
+        for file in materials:
+            extracted_text += extract_text(file) + "\n"
+
+    return {
+        "day": day_number,
+        "focus": focus,
+        "skills": skills,
+        "notes": notes,
+        "materials_text": extracted_text.strip()
+    }
+
+# ----------------------------------
+# COLLECT WEEK DATA
+# ----------------------------------
+st.header("🗂 Upload Materials by Day")
+
+week_data = []
+for d in range(1, 6):
+    week_data.append(day_input(d))
+    st.divider()
+
+# ----------------------------------
+# SIMULATED AI INFERENCE (RULE-BASED)
+# ----------------------------------
+def generate_lesson_plan(week_data):
     """
-    This uses OpenAI GPT to convert raw student materials text
-    into structured JSON matching your lesson plan template.
-    """
-    prompt = f"""
-    You are an expert UK curriculum designer.
-
-    TASK:
-    Using the following student-facing materials, generate a JSON 
-    containing all placeholders for a 5-day lesson plan.
-    
-    Placeholders include:
-    Class1_LearningObjective, Class1_SuccessCriteria, Class1_Vocabulary, Class1_KeyQuestions,
-    Class1_StarterActivity, Class1_MainTeaching, Class1_DifferentiatedActivities, 
-    Class1_Plenary, Class1_Reflection, Class1_Homework
-    (and similarly for Classes 2–5).
-
-    Output only valid JSON.
-
-    MATERIALS:
-    {text_content}
+    This simulates AI output while strictly following the locked prompt.
+    It will be replaced later by a real LLM call.
     """
 
-    response = openai.ChatCompletion.create(
-        model="gpt-4",
-        messages=[{"role":"user", "content": prompt}],
-        temperature=0
-    )
-    # Extract JSON from AI response
-    content = response['choices'][0]['message']['content']
-    return content
+    output = {}
 
-# Function to populate Word template
-def populate_template(json_dict):
-    template_path = os.path.join("templates", "WLPT.docx")
-    if not os.path.exists(template_path):
-        st.error("Template WLPT.docx not found in templates folder!")
-        return None
+    for day in week_data:
+        d = day["day"]
 
+        output[f"Class{d}_LearningObjective"] = (
+            f"Students will develop {day['skills']} skills. "
+            f"Students will apply these skills during {day['focus']}."
+        )
+
+        output[f"Class{d}_SuccessCriteria"] = (
+            "Students can demonstrate understanding through accurate responses, "
+            "use of subject vocabulary, and completed independent work."
+        )
+
+        output[f"Class{d}_KeyVocabulary"] = (
+            "adventure, description, tension, verb, atmosphere"
+        )
+
+        output[f"Class{d}_KeyQuestions"] = (
+            "How does the writer engage the reader? "
+            "Which language choices are most effective?"
+        )
+
+        output[f"Class{d}_StarterActivity"] = (
+            "The teacher introduces a short retrieval or discussion task linked "
+            "to prior learning. Students respond orally or in writing."
+        )
+
+        output[f"Class{d}_MainTeaching"] = (
+            "The teacher models the target skill using the uploaded materials, "
+            "thinking aloud and questioning students to check understanding."
+        )
+
+        output[f"Class{d}_DifferentiatedActivities"] = (
+            "Students complete independent work based on the modelled example. "
+            "LA students receive guided prompts, MA students complete the core task, "
+            "and HA students extend responses through depth or justification."
+        )
+
+        output[f"Class{d}_Plenary"] = (
+            "Students complete an exit task or self-check against success criteria. "
+            "The teacher gathers evidence of learning through responses."
+        )
+
+        output[f"Class{d}_Reflection"] = ""  # MUST remain blank
+        output[f"Class{d}_Homework"] = ""    # Left blank unless explicitly requested
+
+    return output
+
+# ----------------------------------
+# WORD TEMPLATE POPULATION
+# ----------------------------------
+def populate_template(template_path, data):
     doc = Document(template_path)
+
     for table in doc.tables:
         for row in table.rows:
             for cell in row.cells:
-                for key, value in json_dict.items():
+                for key, value in data.items():
                     placeholder = f"{{{{{key}}}}}"
                     if placeholder in cell.text:
                         cell.text = cell.text.replace(placeholder, value)
-    output_path = "LessonPlan_Filled.docx"
-    doc.save(output_path)
-    return output_path
 
-# Streamlit app starts here
-def main():
-    st.set_page_config(page_title="5-Day AI Lesson Plan Generator", layout="wide")
-    st.title("5-Day AI Lesson Plan Generator")
-    st.write("""
-    Upload your student-facing materials (DOCX, PDF, PPTX). 
-    The app will analyze the content and automatically create 
-    a complete 5-day lesson plan in your WLPT Word template.
-    """)
+    tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".docx")
+    doc.save(tmp_file.name)
+    return tmp_file.name
 
-    uploaded_files = st.file_uploader(
-        "Upload materials", type=["docx", "pdf", "pptx"], accept_multiple_files=True
-    )
+# ----------------------------------
+# GENERATE BUTTON
+# ----------------------------------
+if st.button("✨ Generate Weekly Lesson Plan"):
+    with st.spinner("Analysing materials and generating lesson plan..."):
+        lesson_data = generate_lesson_plan(week_data)
+        output_path = populate_template("templates/WLPT.docx", lesson_data)
 
-    if uploaded_files:
-        all_text = []
-        for file in uploaded_files:
-            if file.name.endswith(".docx"):
-                all_text.append(extract_text_docx(file))
-            elif file.name.endswith(".pdf"):
-                all_text.append(extract_text_pdf(file))
-            elif file.name.endswith(".pptx"):
-                all_text.append(extract_text_pptx(file))
+    st.success("Weekly lesson plan generated successfully.")
 
-        combined_text = "\n".join(all_text)
-        st.info("Extracted text from uploaded materials. Sending to AI...")
-
-        try:
-            # Generate lesson plan JSON using AI
-            json_str = generate_lesson_plan(combined_text)
-            json_dict = eval(json_str)  # Convert JSON string to dict (careful: make sure AI returns valid JSON)
-            st.success("Lesson plan generated by AI!")
-
-            # Populate Word template
-            output_file = populate_template(json_dict)
-            if output_file:
-                with open(output_file, "rb") as f:
-                    st.download_button(
-                        label="Download Populated Lesson Plan",
-                        data=f,
-                        file_name="LessonPlan_Filled.docx",
-                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    )
-        except Exception as e:
-            st.error(f"Error generating lesson plan: {e}")
-    else:
-        st.info("Please upload at least one student-facing material file.")
-
-if __name__ == "__main__":
-    main()
+    with open(output_path, "rb") as f:
+        st.download_button(
+            "⬇ Download Lesson Plan",
+            f,
+            file_name="Weekly_Lesson_Plan.docx"
+        )
