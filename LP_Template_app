@@ -1,113 +1,52 @@
 import streamlit as st
-from pptx import Presentation
-import fitz  # PyMuPDF
 from docx import Document
-from docx.shared import Inches
-import requests
 import json
 
-# -----------------------------
-# Helper Functions
-# -----------------------------
-def extract_text_pptx(file):
-    prs = Presentation(file)
-    text = []
-    for slide in prs.slides:
-        for shape in slide.shapes:
-            if hasattr(shape, "text"):
-                text.append(shape.text)
-    return "\n".join(text)
+st.set_page_config(page_title="5-Day AI Lesson Plan Generator", layout="wide")
+st.title("5-Day AI Lesson Plan Generator")
 
-def extract_text_pdf(file):
-    doc = fitz.open(file)
-    text = ""
-    for page in doc:
-        text += page.get_text()
-    return text
+st.write("""
+Upload your AI-generated JSON output containing the lesson plan data.
+The app will populate the WLPT Word template with your content.
+""")
 
-def extract_text_docx(file):
-    doc = Document(file)
-    return "\n".join([p.text for p in doc.paragraphs])
+# Upload JSON file from user
+uploaded_file = st.file_uploader("Upload AI JSON output", type="json")
 
-def call_free_llm(prompt):
-    # Hugging Face free model example
-    API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-large"
-    headers = {"Authorization": "Bearer YOUR_HUGGINGFACE_TOKEN"}  # Replace with free token
-    payload = {"inputs": prompt}
-    response = requests.post(API_URL, headers=headers, json=payload)
-    if response.status_code == 200:
-        return response.json()[0]['generated_text']
-    else:
-        return "LLM error: " + str(response.status_code)
+if uploaded_file:
+    try:
+        # Load JSON content
+        lesson_plan_json = json.load(uploaded_file)
 
-def generate_word_table(lesson_plan_json, output_file="LessonPlan.docx"):
-    doc = Document()
-    doc.add_heading(f"Weekly Lesson Plan - Year {lesson_plan_json['YearClass']}", 0)
-    doc.add_paragraph(f"Unit / Topic: {lesson_plan_json['UnitTopic']}")
-    doc.add_paragraph(f"Teacher: {lesson_plan_json['Teacher']}")
-    
-    # Table: 11 rows (fields) x 6 columns (1 for field names + 5 days)
-    fields = ["Learning Objective", "Success Criteria", "Key Vocabulary", "Key Questions",
-              "Starter Activity", "Main Teaching", "Differentiated Activities", "Plenary",
-              "Reflection", "Homework"]
-    table = doc.add_table(rows=len(fields)+1, cols=6)
-    table.style = 'Table Grid'
-    
-    # Header row
-    table.cell(0,0).text = "Field / Day"
-    for i in range(5):
-        table.cell(0,i+1).text = f"Day {i+1} ({lesson_plan_json['Classes'][i]['Day']})"
-    
-    # Fill table
-    for row_idx, field in enumerate(fields):
-        table.cell(row_idx+1,0).text = field
-        for col_idx in range(5):
-            table.cell(row_idx+1, col_idx+1).text = lesson_plan_json['Classes'][col_idx].get(field.replace(" ", ""), "N/A")
-    
-    doc.save(output_file)
-    return output_file
+        # Load the Word template
+        template_path = "templates/WLPT.docx"
+        template_doc = Document(template_path)
 
-# -----------------------------
-# Streamlit UI
-# -----------------------------
-st.title("💡 Free AI-Powered 5-Day Lesson Plan Generator")
-st.write("Upload your 5 days of student-facing materials (PPTX, PDF, DOCX, or TXT)")
+        # Replace placeholders in all tables
+        for table in template_doc.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    for key, value in lesson_plan_json.items():
+                        placeholder = f"{{{{{key}}}}}"  # e.g., {{Class1_LearningObjective}}
+                        if placeholder in cell.text:
+                            cell.text = cell.text.replace(placeholder, value)
 
-days = {}
-for i in range(1,6):
-    st.subheader(f"Day {i}")
-    uploaded_file = st.file_uploader(f"Upload Day {i} materials", type=['pptx','pdf','docx','txt'], key=f"file{i}")
-    if uploaded_file is not None:
-        if uploaded_file.type == "application/vnd.openxmlformats-officedocument.presentationml.presentation":
-            days[f"Day{i}"] = extract_text_pptx(uploaded_file)
-        elif uploaded_file.type == "application/pdf":
-            days[f"Day{i}"] = extract_text_pdf(uploaded_file)
-        elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-            days[f"Day{i}"] = extract_text_docx(uploaded_file)
-        else:  # txt
-            days[f"Day{i}"] = str(uploaded_file.read(), "utf-8")
+        # Save the populated lesson plan
+        output_path = "LessonPlan_Filled.docx"
+        template_doc.save(output_path)
 
-if st.button("Generate Lesson Plan"):
-    if len(days) < 5:
-        st.warning("Please upload materials for all 5 days!")
-    else:
-        st.info("Generating lesson plan… this may take a few seconds")
+        st.success("Lesson plan generated successfully!")
 
-        # Build master prompt
-        prompt = "You are an expert UK curriculum designer. Generate a fully populated 5-day lesson plan in JSON format matching these fields: LearningObjective, SuccessCriteria, KeyVocabulary, KeyQuestions, StarterActivity, MainTeaching, DifferentiatedActivities, Plenary, Reflection, Homework. Use professional British-English teacher language. Ensure progression over 5 days. Materials:\n"
-        for i in range(1,6):
-            prompt += f"Day {i} Materials:\n{days[f'Day{i}']}\n"
+        # Provide download button
+        with open(output_path, "rb") as f:
+            st.download_button(
+                label="Download Populated Lesson Plan",
+                data=f,
+                file_name="LessonPlan_Filled.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            )
 
-        # Call AI
-        json_text = call_free_llm(prompt)
-
-        try:
-            lesson_plan_json = json.loads(json_text)
-        except:
-            st.warning("AI did not return valid JSON. Here is the raw output:")
-            st.text(json_text)
-        else:
-            # Generate Word table
-            doc_file = generate_word_table(lesson_plan_json)
-            st.success("✅ Lesson Plan Generated! Ready to download.")
-            st.download_button("Download Lesson Plan (Word)", doc_file)
+    except Exception as e:
+        st.error(f"Error processing file: {e}")
+else:
+    st.info("Please upload your AI-generated JSON file to populate the template.")
