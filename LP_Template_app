@@ -1,7 +1,8 @@
-# LP_Template_app.py
+# streamlit_app.py
 import streamlit as st
 from docx import Document
 import json
+import os
 
 def main():
     # Page configuration
@@ -22,8 +23,13 @@ def main():
             # Load JSON content
             lesson_plan_json = json.load(uploaded_file)
 
+            # Ensure templates folder exists
+            template_path = os.path.join("templates", "WLPT.docx")
+            if not os.path.exists(template_path):
+                st.error("Template file WLPT.docx not found in templates folder!")
+                return
+
             # Load the Word template
-            template_path = "templates/WLPT.docx"
             template_doc = Document(template_path)
 
             # Replace placeholders in all tables
@@ -55,6 +61,6 @@ def main():
     else:
         st.info("Please upload your AI-generated JSON file to populate the template.")
 
-# Main guard
+# Main guard to ensure Streamlit runs correctly
 if __name__ == "__main__":
     main()
