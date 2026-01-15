@@ -178,6 +178,7 @@ if st.button("Generate Lesson Plan", use_container_width=True):
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #9CA3AF; font-size: 0.875rem;">
-    <p>Paste your JSON data with keys like <code>Class1_LearningObjective</code>, <code>Class2_SuccessCriteria</code>, etc.</p>
+    <p>Use JSON keys like <code>Class1_LearningObjective</code>, <code>Class1_SuccessCriteria</code>, <code>Class1_Vocabulary</code>, etc.</p>
+    <p>Include all fields from Class1 through Class5 for each day</p>
 </div>
 """, unsafe_allow_html=True)
