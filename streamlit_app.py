@@ -14,35 +14,44 @@ st.title("📄 Weekly Lesson Plan Generator")
 def populate_lesson_plan(json_data, template_path):
     """
     Populates a Word template with lesson plan JSON data.
-    Supports both nested 'Classes' JSON and flat JSON.
+    Replaces placeholders in both paragraphs and tables.
     Returns path to a safe temporary output file.
     """
     doc = Document(template_path)
     
-    def escape_for_regex(text):
-        if not text:
-            return ""
-        return str(text)  # Avoid over-escaping which can break docx XML
+    def replace_text_in_paragraphs(paragraphs, placeholder, value):
+        for p in paragraphs:
+            if "{{" + placeholder + "}}" in p.text:
+                inline = p.runs
+                for i in range(len(inline)):
+                    if "{{" + placeholder + "}}" in inline[i].text:
+                        inline[i].text = inline[i].text.replace("{{" + placeholder + "}}", str(value))
+
+    def replace_text_in_tables(tables, placeholder, value):
+        for table in tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    replace_text_in_paragraphs(cell.paragraphs, placeholder, value)
 
     # --- Top-level placeholders ---
     top_fields = ["Teacher","Year/Class","Subject","Unit/Topic","Week number","Date"]
     for field in top_fields:
         if field in json_data:
-            for p in doc.paragraphs:
-                p.text = re.sub(r"\{\{" + field + r"\}\}", escape_for_regex(json_data[field]), p.text)
+            replace_text_in_paragraphs(doc.paragraphs, field, json_data[field])
+            replace_text_in_tables(doc.tables, field, json_data[field])
 
     # --- Nested Classes ---
     if "Classes" in json_data:
         for class_key, class_obj in json_data["Classes"].items():
             for placeholder, value in class_obj.items():
-                for p in doc.paragraphs:
-                    p.text = re.sub(r"\{\{" + placeholder + r"\}\}", escape_for_regex(value), p.text)
+                replace_text_in_paragraphs(doc.paragraphs, placeholder, value)
+                replace_text_in_tables(doc.tables, placeholder, value)
 
     # --- Flattened placeholders ---
     for placeholder, value in json_data.items():
         if placeholder not in top_fields and placeholder != "Classes":
-            for p in doc.paragraphs:
-                p.text = re.sub(r"\{\{" + placeholder + r"\}\}", escape_for_regex(value), p.text)
+            replace_text_in_paragraphs(doc.paragraphs, placeholder, value)
+            replace_text_in_tables(doc.tables, placeholder, value)
 
     # Save to a safe temporary file
     tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".docx")
