@@ -1,126 +1,38 @@
-# streamlit_app.py
-# WLPT Template Filler – Stable Version
+function myFunction(lessonPlan) {
+  // 📄 Open your Google Doc by ID
+  var templateId = "1mJFVM8TiPce4kJ76P3NKuvn-NwRIZjYJzQt86rIRKJY";
+  var doc = DocumentApp.openById(templateId);
+  var body = doc.getBody();
 
-import streamlit as st
-from docx import Document
-import json
-import os
+  // 🔁 Utility: escape special regex characters in replacement text
+  function escapeForReplaceText(str) {
+    if (!str) return ""; // handle empty or null
+    return str.replace(/([.*+?^=!:${}()|\[\]\/\\])/g, "\\$1");
+  }
 
-# --------------------------------------------------
-# Helper: Populate WLPT template
-# --------------------------------------------------
-def populate_template(lesson_plan_json):
-    template_path = os.path.join("templates", "WLPT.docx")
+  // 📌 Replace top-level placeholders (headers) if present
+  var topLevelFields = ["Teacher", "Year/Class", "Subject", "Unit/Topic", "Week number", "Date"];
+  topLevelFields.forEach(function(field) {
+    if (lessonPlan[field]) {
+      body.replaceText("\\{\\{" + field + "\\}\\}", escapeForReplaceText(lessonPlan[field]));
+    }
+  });
 
-    if not os.path.exists(template_path):
-        st.error("❌ WLPT.docx not found in the templates folder.")
-        return None
+  // 🔁 Replace class placeholders dynamically
+  if (lessonPlan.Classes) {
+    for (var classKey in lessonPlan.Classes) {
+      var classObj = lessonPlan.Classes[classKey];
+      for (var placeholder in classObj) {
+        if (classObj[placeholder]) { // ignore empty fields
+          body.replaceText(
+            "\\{\\{" + placeholder + "\\}\\}",
+            escapeForReplaceText(classObj[placeholder])
+          );
+        }
+      }
+    }
+  }
 
-    doc = Document(template_path)
-
-    for table in doc.tables:
-        for row in table.rows:
-            for cell in row.cells:
-                for key, value in lesson_plan_json.items():
-                    placeholder = f"{{{{{key}}}}}"
-                    if placeholder in cell.text:
-                        cell.text = cell.text.replace(placeholder, str(value))
-
-    output_path = "WLPT_Populated.docx"
-    doc.save(output_path)
-    return output_path
-
-
-# --------------------------------------------------
-# Main App
-# --------------------------------------------------
-def main():
-    st.set_page_config(
-        page_title="5-Day AI Lesson Plan Generator",
-        layout="wide"
-    )
-
-    st.title("5-Day AI Lesson Plan Generator")
-    st.write(
-        """
-        Paste or upload a **WLPT-compatible JSON lesson plan**.
-        The app will populate the official **WLPT Word template**
-        while preserving logos and table formatting.
-        """
-    )
-
-    st.divider()
-
-    # ---------------------------
-    # OPTION 1: Upload JSON file
-    # ---------------------------
-    st.subheader("Option 1: Upload JSON file")
-    uploaded_file = st.file_uploader(
-        "Upload AI-generated JSON",
-        type="json"
-    )
-
-    # ---------------------------
-    # OPTION 2: Paste JSON
-    # ---------------------------
-    st.subheader("Option 2: Paste JSON")
-    pasted_json = st.text_area(
-        "Paste your WLPT JSON here",
-        height=320,
-        placeholder="""
-{
-  "Class1_LearningObjective": "Students will...",
-  "Class1_SuccessCriteria": "Students can...",
-  "Class1_Vocabulary": "...",
-  "Class1_KeyQuestions": "...",
-  "Class1_StarterActivity": "...",
-  "Class1_MainTeaching": "...",
-  "Class1_DifferentiatedActivities": "...",
-  "Class1_Plenary": "...",
-  "Class1_Reflection": "",
-  "Class1_Homework": ""
+  // 📌 Save and close the document
+  doc.saveAndClose();
 }
-"""
-    )
-
-    st.divider()
-
-    # ---------------------------
-    # Process input
-    # ---------------------------
-    if uploaded_file or pasted_json.strip():
-
-        try:
-            if uploaded_file:
-                lesson_plan_json = json.load(uploaded_file)
-            else:
-                lesson_plan_json = json.loads(pasted_json)
-
-            output_path = populate_template(lesson_plan_json)
-
-            if output_path:
-                st.success("✅ Lesson plan generated successfully.")
-
-                with open(output_path, "rb") as f:
-                    st.download_button(
-                        label="⬇ Download WLPT Lesson Plan",
-                        data=f,
-                        file_name="WLPT_Lesson_Plan.docx",
-                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    )
-
-        except json.JSONDecodeError:
-            st.error("❌ Invalid JSON format. Please check commas, quotes, and brackets.")
-
-        except Exception as e:
-            st.error(f"❌ An error occurred: {e}")
-
-    else:
-        st.info("ℹ️ Upload or paste WLPT-compatible JSON to continue.")
-
-
-# --------------------------------------------------
-# Entry point
-# --------------------------------------------------
-if __name__ == "__main__":
-    main()
