@@ -8,15 +8,13 @@ import os
 st.set_page_config(page_title="Weekly Lesson Plan Generator", layout="wide")
 st.title("📄 Weekly Lesson Plan Generator")
 
-st.markdown(
-    """
-    Upload your lesson plan JSON file or paste JSON data to populate your 5-day Word template.
-    You can also generate a **sample JSON** for all 5 days to use as a starting point.
-    """
-)
+st.markdown("""
+Upload your lesson plan JSON file or paste JSON data to populate your 5-day Word template.
+You can also generate a **sample JSON** for all 5 days as a starting point.
+""")
 
 # Path to Word template
-TEMPLATE_PATH = os.path.join("templates", "LessonPlanTemplate.docx")
+TEMPLATE_PATH = os.path.join("templates", "WLPT.docx")
 
 if not os.path.exists(TEMPLATE_PATH):
     st.error(f"Template not found at {TEMPLATE_PATH}. Please check the templates folder.")
@@ -26,7 +24,7 @@ if not os.path.exists(TEMPLATE_PATH):
 json_file = st.file_uploader("Upload your lesson plan JSON file", type=["json"])
 json_text = st.text_area("Or paste JSON here:")
 
-# Optional: Generate sample JSON for all 5 days
+# Button to generate sample JSON
 if st.button("Generate Sample JSON for 5 Days"):
     sample_json = {
         f"Class{i}_{field}": f"Sample {field} for Class {i}" 
@@ -70,7 +68,7 @@ if json_file or json_text:
     # Replace placeholders in paragraphs
     for paragraph in doc.paragraphs:
         for key, value in flat_data.items():
-            placeholder = f"{{{{{key}}}}}"
+            placeholder = f"{{{{{key}}}}}"  # e.g., {{Class1_LearningObjective}}
             if placeholder in paragraph.text:
                 paragraph.text = paragraph.text.replace(placeholder, str(value))
 
