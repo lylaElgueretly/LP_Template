@@ -1,29 +1,56 @@
-function myFunction(lessonPlan) {
-  var templateId = "1mJFVM8TiPce4kJ76P3NKuvn-NwRIZjYJzQt86rIRKJY";
-  var doc = DocumentApp.openById(templateId);
-  var body = doc.getBody();
+# -----------------------------
+# Python Version of Lesson Plan Updater
+# -----------------------------
 
-  function escapeForReplaceText(str) {
-    if (!str) return "";
-    return str.replace(/([.*+?^=!:${}()|\[\]\/\\])/g, "\\$1");
-  }
+from googleapiclient.discovery import build
+from google.oauth2 import service_account
+import json
 
-  ["Teacher","Year/Class","Subject","Unit/Topic","Week number","Date"].forEach(function(field){
-    if (lessonPlan[field]) {
-      body.replaceText("\\{\\{" + field + "\\}\\}", escapeForReplaceText(lessonPlan[field]));
-    }
-  });
+# -----------------------------
+# Google Docs API setup
+# -----------------------------
+SCOPES = ['https://www.googleapis.com/auth/documents']
+SERVICE_ACCOUNT_FILE = 'service_account.json'  # Path to your service account JSON file
 
-  if (lessonPlan.Classes) {
-    for (var classKey in lessonPlan.Classes) {
-      var classObj = lessonPlan.Classes[classKey];
-      for (var placeholder in classObj) {
-        if (classObj[placeholder]) {
-          body.replaceText("\\{\\{" + placeholder + "\\}\\}", escapeForReplaceText(classObj[placeholder]));
-        }
-      }
-    }
-  }
+creds = service_account.Credentials.from_service_account_file(
+    SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+service = build('docs', 'v1', credentials=creds)
 
-  doc.saveAndClose();
-}
+DOCUMENT_ID = '1mJFVM8TiPce4kJ76P3NKuvn-NwRIZjYJzQt86rIRKJY'  # Your template Google Doc ID
+
+# -----------------------------
+# Function to replace placeholders in the Doc
+# -----------------------------
+def update_lesson_plan(lesson_plan_json):
+    """
+    Updates a Google Doc template with lesson plan data from a JSON object.
+    
+    lesson_plan_json: JSON object/dict containing the lesson plan
+    """
+    requests = []
+
+    # Replace top-level fields
+    for field in ["Teacher","Year/Class","Subject","Unit/Topic","Week number","Date"]:
+        if field in lesson_plan_json:
+            requests.append({
+                'replaceAllText': {
+                    'containsText': {'text': f'{{{{{field}}}}}', 'matchCase': True},
+                    'replaceText': lesson_plan_json[field]
+                }
+            })
+
+    # Replace class placeholders
+    if "Classes" in lesson_plan_json:
+        for class_key, class_obj in lesson_plan_json["Classes"].items():
+            for placeholder, value in class_obj.items():
+                if value:
+                    requests.append({
+                        'replaceAllText': {
+                            'containsText': {'text': f'{{{{{placeholder}}}}}', 'matchCase': True},
+                            'replaceText': value
+                        }
+                    })
+
+    # Execute batch update
+    result = service.documents().batchUpdate(
+        docu
