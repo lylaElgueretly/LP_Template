@@ -1,85 +1,99 @@
-# -----------------------------
-# Streamlit App: Lesson Plan Template Filler
-# -----------------------------
-
+# streamlit_app.py
 import streamlit as st
-import json
 from docx import Document
-from io import BytesIO
+import json
+import io
+import os
 
-st.set_page_config(page_title="Lesson Plan Template Generator", layout="wide")
+st.set_page_config(page_title="Weekly Lesson Plan Generator", layout="wide")
+st.title("📄 Weekly Lesson Plan Generator")
 
-st.title("Lesson Plan Template Generator")
-st.markdown("""
-Paste your lesson plan JSON below and click 'Generate Word Document'.  
-Your Word template should have placeholders like `{{Teacher}}`, `{{LearningObjective}}`, etc.
-""")
-
-# -----------------------------
-# Upload Word template
-# -----------------------------
-template_file = st.file_uploader("Upload your Word template (.docx)", type="docx")
-
-# Paste JSON
-lesson_plan_input = st.text_area("Paste your lesson plan JSON here:")
-
-# -----------------------------
-# Logic to replace placeholders
-# -----------------------------
-def replace_placeholders(doc, lesson_plan):
+st.markdown(
     """
-    Replaces placeholders in a Word doc with values from the JSON lesson plan.
-    Handles both top-level fields and class-level fields.
+    Upload your lesson plan JSON file or paste JSON data to populate your 5-day Word template.
+    You can also generate a **sample JSON** for all 5 days to use as a starting point.
     """
-    # Top-level fields
-    for field in ["Teacher","Year/Class","Subject","Unit/Topic","Week number","Date"]:
-        if field in lesson_plan:
-            for p in doc.paragraphs:
-                if f"{{{{{field}}}}}" in p.text:
-                    inline = p.runs
-                    for i in range(len(inline)):
-                        inline[i].text = inline[i].text.replace(f"{{{{{field}}}}}", lesson_plan[field])
+)
 
-    # Class-level fields
-    if "Classes" in lesson_plan:
-        for class_key, class_obj in lesson_plan["Classes"].items():
-            for placeholder, value in class_obj.items():
-                for p in doc.paragraphs:
-                    if f"{{{{{placeholder}}}}}" in p.text:
-                        inline = p.runs
-                        for i in range(len(inline)):
-                            inline[i].text = inline[i].text.replace(f"{{{{{placeholder}}}}}", value)
-    return doc
+# Path to Word template
+TEMPLATE_PATH = os.path.join("templates", "LessonPlanTemplate.docx")
 
-# -----------------------------
-# Button to generate Word document
-# -----------------------------
-if st.button("Generate Word Document"):
-    if not template_file:
-        st.error("Please upload a Word template file.")
-    elif not lesson_plan_input.strip():
-        st.error("Please paste valid JSON.")
-    else:
-        try:
-            lesson_plan_json = json.loads(lesson_plan_input)
-            doc = Document(template_file)
-            doc = replace_placeholders(doc, lesson_plan_json)
+if not os.path.exists(TEMPLATE_PATH):
+    st.error(f"Template not found at {TEMPLATE_PATH}. Please check the templates folder.")
+    st.stop()
 
-            # Save to in-memory file
-            output = BytesIO()
-            doc.save(output)
-            output.seek(0)
+# JSON input
+json_file = st.file_uploader("Upload your lesson plan JSON file", type=["json"])
+json_text = st.text_area("Or paste JSON here:")
 
-            st.download_button(
-                label="Download Populated Template",
-                data=output,
-                file_name="Lesson_Plan.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            )
+# Optional: Generate sample JSON for all 5 days
+if st.button("Generate Sample JSON for 5 Days"):
+    sample_json = {
+        f"Class{i}_{field}": f"Sample {field} for Class {i}" 
+        for i in range(1, 6) 
+        for field in [
+            "LearningObjective", "SuccessCriteria", "Vocabulary", "KeyQuestions",
+            "StarterActivity", "MainTeaching", "DifferentiatedActivities",
+            "Plenary", "Reflection", "Homework"
+        ]
+    }
+    st.code(json.dumps(sample_json, indent=4), language="json")
+    st.stop()  # Stop here so user can copy the sample JSON
 
-            st.success("Template populated successfully!")
+# Proceed if JSON is provided
+if json_file or json_text:
+    try:
+        if json_file:
+            data = json.load(json_file)
+        else:
+            data = json.loads(json_text)
+    except Exception as e:
+        st.error(f"Invalid JSON: {e}")
+        st.stop()
 
-        except json.JSONDecodeError as e:
-            st.error(f"Invalid JSON: {e}")
-        except Exception as e:
-            st.error(f"Error generating document: {e}")
+    # Load Word template
+    doc = Document(TEMPLATE_PATH)
+
+    # Flatten nested JSON if needed
+    def flatten_json(d, parent_key='', sep='_'):
+        items = {}
+        for k, v in d.items():
+            new_key = f"{parent_key}{sep}{k}" if parent_key else k
+            if isinstance(v, dict):
+                items.update(flatten_json(v, new_key, sep=sep))
+            else:
+                items[new_key] = v
+        return items
+
+    flat_data = flatten_json(data)
+
+    # Replace placeholders in paragraphs
+    for paragraph in doc.paragraphs:
+        for key, value in flat_data.items():
+            placeholder = f"{{{{{key}}}}}"
+            if placeholder in paragraph.text:
+                paragraph.text = paragraph.text.replace(placeholder, str(value))
+
+    # Replace placeholders in tables
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for key, value in flat_data.items():
+                    placeholder = f"{{{{{key}}}}}"
+                    if placeholder in cell.text:
+                        cell.text = cell.text.replace(placeholder, str(value))
+
+    # Save populated document to memory
+    output = io.BytesIO()
+    doc.save(output)
+    output.seek(0)
+
+    st.success("✅ Lesson plan generated successfully!")
+    st.download_button(
+        label="📥 Download Populated Lesson Plan",
+        data=output,
+        file_name="Weekly_Lesson_Plan.docx",
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )
+else:
+    st.info("Please provide JSON data (file or paste) to generate the lesson plan.")
