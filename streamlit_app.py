@@ -54,7 +54,7 @@ st.write("Upload your lesson plan JSON file or paste JSON data to populate your 
 uploaded_file = st.file_uploader("Upload JSON", type="json")
 if uploaded_file:
     lesson_json = json.load(uploaded_file)
-    output_file = populate_lesson_plan(lesson_json, "WLPT.docx", "WeeklyLessonPlan_output.docx")
+    output_file = populate_lesson_plan(lesson_json, "templates/WLPT.docx", "WeeklyLessonPlan_output.docx")
     st.success(f"Lesson plan generated: {output_file}")
     st.download_button("Download Lesson Plan", output_file, file_name="WeeklyLessonPlan_output.docx")
 
@@ -63,7 +63,7 @@ json_input = st.text_area("Or paste JSON here:")
 if st.button("Generate from pasted JSON") and json_input:
     try:
         lesson_json = json.loads(json_input)
-        output_file = populate_lesson_plan(lesson_json, "WLPT.docx", "WeeklyLessonPlan_output.docx")
+        output_file = populate_lesson_plan(lesson_json, "templates/WLPT.docx", "WeeklyLessonPlan_output.docx")
         st.success(f"Lesson plan generated: {output_file}")
         st.download_button("Download Lesson Plan", output_file, file_name="WeeklyLessonPlan_output.docx")
     except Exception as e:
